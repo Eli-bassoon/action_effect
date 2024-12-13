@@ -82,7 +82,7 @@ def load_blip2():
     model = Blip2ForConditionalGeneration.from_pretrained("Salesforce/blip2-opt-2.7b", revision="51572668da0eb669e01a189dc22abe6088589a24", torch_dtype=torch.float16).to(device)
     return model, processor
 
-def generate_all_captions(images_to_caption, version="blip2", function_to_use=0, try_all=False, save_file='./saved_captions/captions.pt'):
+def generate_all_captions(images_to_caption, version="blip2", function_to_use=0, try_all=False, save_file='./saved_captions/captions.txt'):
 
     assert(len(images_to_caption) != 0)
 
@@ -183,11 +183,32 @@ def generate_all_captions(images_to_caption, version="blip2", function_to_use=0,
 
         images_to_caption = caption_function(images_to_caption)
 
+        clipped_captions = []
+        
+        # Get how much filler text to skip at the start of the caption
+        if version == 'blip':
+            match function_to_use:
+                case 0:
+                    skipby = 0
+                case 1:
+                    skipby = len("An image of ")
+                case 2:
+                    skipby = len("Focusing on the physical description, this is an image of ")
+        else:
+            match function_to_use:
+                case 0:
+                    skipby = 0
+                case 1 | 2:
+                    skipby = len("An image of ")
+        
+        # Print captions
         for entry in images_to_caption:
-            # display(entry["image"])
             print("CAPTION: ", entry["caption"])
-
-        torch.save(images_to_caption, save_file)
+            clipped_captions.append(entry["caption"][skipby:])
+        
+        if save_file != '':
+            with open(save_file, 'w') as f:
+                f.write('\n'.join(clipped_captions))
         
         return images_to_caption
 
@@ -222,7 +243,7 @@ if __name__ == "__main__":
     parser.add_argument("--debug", type=bool, default=False, help="Use this for testing all captioning functions")
     parser.add_argument("--version", type=str, default="blip2", help="Specify which model to use")
     parser.add_argument("--function_to_use", type=int, default=0, help="Specify which captioning function to use")
-    parser.add_argument('--save_file', type=str, default='captions.pt', help='Which file to save the captions to')
+    parser.add_argument('--save_file', type=str, default='captions.txt', help='Which file to save the captions to')
  
     params, unknown = parser.parse_known_args()
     model = main(params)
