@@ -104,7 +104,7 @@ def generate_all_captions(images_to_caption, version="blip2", function_to_use=0,
     def generate_caption_blip_v0(images_to_caption):
         for image_data in images_to_caption:
             image = image_data["image"]
-            inputs = processor(images=image, text="An image of", return_tensors="pt").to(device, torch.float16)
+            inputs = processor(images=image, return_tensors="pt").to(device, torch.float16)
             with torch.no_grad():
                 output_ids = model.generate(**inputs, max_new_tokens=20)
             caption = processor.decode(output_ids[0], skip_special_tokens=True)
@@ -114,7 +114,7 @@ def generate_all_captions(images_to_caption, version="blip2", function_to_use=0,
     def generate_caption_blip_v1(images_to_caption):
         for image_data in images_to_caption:
             image = image_data["image"]
-            inputs = processor(images=image, text="Focusing on the spatial relationships, this is", return_tensors="pt").to(device, torch.float16)
+            inputs = processor(images=image, text="An image of", return_tensors="pt").to(device, torch.float16)
             with torch.no_grad():
                 output_ids = model.generate(**inputs, max_new_tokens=50)
             caption = processor.decode(output_ids[0], skip_special_tokens=True)
@@ -134,7 +134,7 @@ def generate_all_captions(images_to_caption, version="blip2", function_to_use=0,
     def generate_caption_blip2_v0(images_to_caption):
         for image_data in images_to_caption:
             image = image_data["image"]
-            inputs = processor(images=image, text="An image of", return_tensors="pt").to(device, torch.float16)
+            inputs = processor(images=image, return_tensors="pt").to(device, torch.float16)
             with torch.no_grad():
                 output_ids = model.generate(**inputs, max_new_tokens=20)
             caption = processor.decode(output_ids[0], skip_special_tokens=True)
@@ -144,7 +144,7 @@ def generate_all_captions(images_to_caption, version="blip2", function_to_use=0,
     def generate_caption_blip2_v1(images_to_caption):
         for image_data in images_to_caption:
             image = image_data["image"]
-            inputs = processor(images=image, text="Focusing on the spatial relationships, this is", return_tensors="pt").to(device, torch.float16)
+            inputs = processor(images=image, text="An image of", return_tensors="pt").to(device, torch.float16)
             with torch.no_grad():
                 output_ids = model.generate(**inputs, max_new_tokens=50)
             caption = processor.decode(output_ids[0], skip_special_tokens=True)

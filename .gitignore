@@ -161,9 +161,10 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
+archive/
 compressed_captions/
 compressor_lora/
-datasets/
+flat_dataset/
 results/
 saved_captions/
 slurm/

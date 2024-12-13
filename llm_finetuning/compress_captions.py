@@ -1,6 +1,4 @@
-# For Programming Problem 23
-#
-# Please implement the functions below, and feel free to use the any library.
+# Adapted from EECS595 HW3, original name mistral_peft.py
 
 from datasets import load_dataset, Dataset, load_from_disk
 import evaluate
@@ -10,12 +8,12 @@ from trl import SFTConfig, SFTTrainer, DataCollatorForCompletionOnlyLM
 import torch
 import random
 import argparse
-import sys, os
 import tqdm
 import re
+import os, sys
 
-def placeholder():
-    raise NotImplementedError("This function has not been implemented yet.")
+sys.path.append('..')
+from generate_splits import dataset_captions_with_splits
 
 def set_seed(seed):
     random.seed(seed)
@@ -27,6 +25,7 @@ SEED = 595
 set_seed(SEED)
 device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
 
+SAVE_DIR = '../compressed_captions'
 
 def load_model(
     model_name="mistralai/Mistral-7B-v0.3",
@@ -162,7 +161,7 @@ def formatting_prompts_func(example):
     inputs = [
         create_prompt_instruction(
             example['caption'][i],
-            example['action'][i])
+            example['label'][i])
         for i in range(n)]
 
     ###############################################################
@@ -172,6 +171,7 @@ def formatting_prompts_func(example):
 
 
 def load_data_with_collator(
+    dataset,
     split="train",
     sample_size=None,
     tokenizer=None,
@@ -179,10 +179,10 @@ def load_data_with_collator(
     mlm=False
 ):
     """
-    Loads a sample of the PIQA dataset and sets up a DataCollator for completion-only language modeling.
+    Loads a sample of the dataset and sets up a DataCollator for completion-only language modeling.
 
     Params:
-        dataset_name (str, optional): The name of the dataset to load. Default is 'piqa'.
+        dataset (Dataset): The full dataset to use
         split (str, optional): The dataset split to load (e.g., 'train', 'validation', 'test'). Default is 'train'.
         sample_size (int, optional): The number of examples to select from the dataset. Default is 1000.
         tokenizer (AutoTokenizer): The tokenizer to use for tokenizing the data. Must be provided.
@@ -194,7 +194,7 @@ def load_data_with_collator(
     """
 
     # Load the dataset split and select a sample of the data
-    dataset = load_from_disk('./flat_dataset_captions')[split]
+    dataset = dataset[split]
     if sample_size is not None:
         dataset = dataset.select(range(sample_size))
 
@@ -228,7 +228,7 @@ def load_lora_model(base_model, peft_dir="compressor_lora"):
     return model
 
 
-def test(model, tokenizer, dataset, create_prompt_func, prediction_save='compressed_captions_zsh.torch'):
+def test(model, tokenizer, dataset, create_prompt_func, prediction_save='compressed_captions_zsh.pt'):
     # metric = evaluate.load("accuracy")
     outputs, predictions, labels = [], [], []
 
@@ -261,7 +261,7 @@ def test(model, tokenizer, dataset, create_prompt_func, prediction_save='compres
         
         outputs.append(predicted_output)
         predictions.append(predicted_answer)
-        labels.append(example['action'])
+        labels.append(example['label'])
 
     # Calculate accuracy
     # metric.add_batch(predictions=predictions, references=dataset["label"])
@@ -271,14 +271,39 @@ def test(model, tokenizer, dataset, create_prompt_func, prediction_save='compres
     # print(f'Test Accuracy: {score["accuracy"]}')
     
     save_data = dict(
-        outputs=outputs,
-        pred=predictions,
-        gt=labels
+        output=outputs,
+        predicted=predictions,
+        label=labels
     )
     
     # Save predictions to a file
     torch.save(save_data, prediction_save)
+
+
+def get_merged_model(params, use_lora):
+    # Save the trained model and load with LoRA configuration
+    model, tokenizer = load_model(params.model)
     
+    # Load a lora
+    if use_lora:
+        model = load_lora_model(model, params.lora_dir)
+
+    return model, tokenizer
+
+
+def compress_captions_from_file(model, tokenizer, run_name, caption_filename):
+    # Load the dataset
+    dataset = dataset_captions_with_splits(caption_filename)
+    
+    # Get the response template for the task
+    response_template = get_response_template()
+
+    # Load test data
+    dataset_test, _ = load_data_with_collator(dataset, split="test", tokenizer=tokenizer, sample_size=None, response_template=response_template)
+    
+    # Test the model on the test set
+    test(model, tokenizer, dataset_test, create_prompt_instruction, os.path.join(SAVE_DIR, run_name+'.pt'))
+
 
 def main(params):
     """
@@ -287,34 +312,35 @@ def main(params):
     Params:
         params (argparse.Namespace): Command-line arguments passed to configure the training pipeline.
     """
-
-    # Get the response template for the task
-    response_template = get_response_template()
-
-    # Save the trained model and load with LoRA configuration
-    model, tokenizer = load_model(params.model)
     
-    # Load a lora unless told not to
-    if not params.no_lora:
-        model = load_lora_model(model, params.lora_dir)
-
-    # Load test data
-    dataset_test, _ = load_data_with_collator(split="test", tokenizer=tokenizer, sample_size=None, response_template=response_template)
+    if params.all:
+        lora_configs = [True, False]
+    else:
+        lora_configs = [not params.no_lora]
     
-    # Test the model on the test set
-    test(model, tokenizer, dataset_test, create_prompt_instruction)
-
-    return model
+    for use_lora in lora_configs:
+        print('Loading model with ' + ['no lora', 'lora'][use_lora])
+        model, tokenizer = get_merged_model(params, use_lora)
+        
+        for filename in params.caption_files:
+            print('Compressing captions for ' + filename)
+            
+            full_filename = os.path.join(params.caption_dir, filename)
+            run_name = filename.rstrip('.txt')
+            if not use_lora: run_name += '_zsh'
+            
+            compress_captions_from_file(model, tokenizer, run_name, full_filename)
 
 
 if __name__ == "__main__":
-    lora_dir = 'compressor_lora'
-    
     parser = argparse.ArgumentParser(description="Evaluate LLaMA-based model for PIQA Task")
     parser.add_argument("--model", type=str, default="mistralai/Mistral-7B-v0.3", help="Pretrained model name")
+    parser.add_argument("--caption_dir", type=str, default='../captioning/saved_captions', help='Where the caption files are located')
+    parser.add_argument("--caption_files", nargs='+', help="The caption files to compress. Include multiple arguments for multiple files.")
     parser.add_argument("--no_lora", action='store_true', help='Use the base model without a lora')
-    parser.add_argument('--lora_dir', type=str, default=lora_dir, help='Lora directory location')
+    parser.add_argument('--lora_dir', type=str, default='compressor_lora', help='Lora directory location')
+    parser.add_argument('--all', action='store_true', help='Whether to do both zero-shot and lora for the captions')
     
     # Parse arguments and run the main function
     params, unknown = parser.parse_known_args()
-    model = main(params)
+    main(params)
