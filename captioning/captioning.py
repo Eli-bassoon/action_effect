@@ -186,13 +186,15 @@ def generate_all_captions(images_to_caption, version="blip2", function_to_use=0,
                 case 1:
                     skipby = len("An image of ")
                 case 2:
-                    skipby = len("Focusing on the physical description, this is an image of ")
+                    skipby = len("Give a detailed description of the image and the spatial relationships in it. This image shows")
         else:
             match function_to_use:
                 case 0:
                     skipby = 0
                 case 1 | 2:
                     skipby = len("An image of ")
+                case 2:
+                    skipby = len("Give a detailed description of the image and the spatial relationships in it. This image shows")
         
         # Print captions
         for entry in images_to_caption:
