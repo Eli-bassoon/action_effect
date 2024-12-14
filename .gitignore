@@ -162,12 +162,9 @@ cython_debug/
 #.idea/
 
 archive/
-compressed_captions/
+compressed_captions/*/
 compressor_lora/
 flat_dataset/
 results/
-saved_captions/
 slurm/
 wandb/
-*.pt
-*.torch
