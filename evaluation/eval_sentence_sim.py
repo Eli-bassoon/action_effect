@@ -9,7 +9,7 @@ with open(os.path.join(os.path.dirname(__file__), '..', 'categories.txt')) as f:
 model = SentenceTransformer("all-MiniLM-L6-v2")
 
 BG_THRESH = 0.4
-BG_IDX = len(categories)
+BG_IDX = len(categories)-1
 
 # Calculate embeddings for categories
 categories_vec = model.encode(categories[:-1])
@@ -29,31 +29,31 @@ def convert_to_category(predictions, topk=1):
     vals, idxs = torch.sort(similarities, descending=True)
     category_names = [[categories[i] for i in this_idxs] for this_idxs in idxs]
     
-    # # Expand to include background class
-    # vals_exp = torch.zeros((vals.shape[0], vals.shape[1]+1))
-    # idxs_exp = torch.zeros((idxs.shape[0], idxs.shape[1]+1))
+    # Expand to include background class
+    vals_exp = torch.zeros((vals.shape[0], vals.shape[1]+1))
+    idxs_exp = torch.zeros((idxs.shape[0], idxs.shape[1]+1))
     
-    # # Add background category
-    # for i in range(len(predictions)):
-    #     if vals[i, 0] < BG_THRESH:
-    #         vals_exp[i, 0] = 1
-    #         vals_exp[i, 1:] = vals[i, :]
+    # Add background category
+    for i in range(len(predictions)):
+        if vals[i, 0] < BG_THRESH:
+            vals_exp[i, 0] = 1
+            vals_exp[i, 1:] = vals[i, :]
             
-    #         idxs_exp[i, 0] = BG_IDX
-    #         idxs_exp[i, 1:] = idxs[i, :]
+            idxs_exp[i, 0] = BG_IDX
+            idxs_exp[i, 1:] = idxs[i, :]
             
-    #         category_names[i].insert(0, 'background')
-    #     else:
-    #         vals_exp[i, -1] = -1
-    #         vals_exp[i, :-1] = vals[i, :]
+            category_names[i].insert(0, 'background')
+        else:
+            vals_exp[i, :-1] = vals[i, :]
+            vals_exp[i, -1] = -1
             
-    #         idxs_exp[i, -1] = BG_IDX
-    #         idxs_exp[i, :-1] = idxs[i, :]
+            idxs_exp[i, :-1] = idxs[i, :]
+            idxs_exp[i, -1] = BG_IDX
             
-    #         category_names[i].append('background')
+            category_names[i].append('background')
     
-    # vals = vals_exp
-    # idxs = idxs_exp.long()
+    vals = vals_exp
+    idxs = idxs_exp.long()
     
     if topk != -1:
         vals, idxs = vals[:, :topk], idxs[:, :topk]

@@ -66,18 +66,23 @@ def evaluate_single(predictions, labels):
         topk_acc[topk] = acc.item()
         print(f'Top-{topk} acc: {acc}')
     
+    # f1
     pred_idxs_top1 = pred_idxs[:, 0]
     f1_score = sklearn.metrics.f1_score(gt_idxs, pred_idxs_top1, average='macro')
+    print('f1 score:', f1_score)
     
-    # pred_scores_ordered = torch.zeros(len(predictions), len(categories))
-    # pred_scores_ordered[torch.arange(len(predictions)).expand(-1, len(categories)), pred_idxs] = pred_scores
-    # mAP = sklearn.metrics.average_precision_score(gt_idxs, pred_scores_top1, average='macro')
+    # mAP
+    pred_scores_ordered = torch.zeros(len(predictions), len(categories))
+    pred_scores_ordered[torch.arange(len(predictions))[:, None], pred_idxs] = pred_scores
+    gt_idxs_onehot = torch.nn.functional.one_hot(gt_idxs, len(categories))
+    mAP = sklearn.metrics.average_precision_score(gt_idxs_onehot, pred_scores_ordered, average='macro')
+    print('mAP:', mAP)
     
     return dict(
         identical_acc=identical_acc,
         topk_acc=topk_acc,
         f1_score=f1_score,
-        # map=mAP
+        map=mAP
     )
 
 
